@@ -99,7 +99,7 @@ module tb_sync_fifo;
         pop();
         check_flags();
 
-        repeat (DEPTH) push (logic'($urandom_range(0, 255)));
+        repeat (DEPTH) push(8'($urandom_range(0, 255)));
         check_flags();
 
         repeat (DEPTH) pop();
