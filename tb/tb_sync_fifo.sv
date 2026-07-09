@@ -86,7 +86,10 @@ module tb_sync_fifo;
         if (full !== (model_q.size() == DEPTH))
             $error("FULL mismatch time=%0t exp=%0b got=%0b", $time, (model_q.size() == DEPTH), full);
     endtask
-
+initial begin
+    $dumpfile("tb_sync_fifo.vcd");
+    $dumpvars(0, tb_sync_fifo);
+end
     initial begin
         reset_dut();
 
