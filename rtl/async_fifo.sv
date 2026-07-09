@@ -28,8 +28,8 @@ module async_fifo #(
         return (bin >> 1) ^ bin;
     endfunction
 
-    assign wr_ptr_bin_next  = wr_ptr_bin + ((wr_en && !full) ? 1'b1 : 1'b0);
-    assign rd_ptr_bin_next  = rd_ptr_bin + ((rd_en && !empty) ? 1'b1 : 1'b0);
+    assign wr_ptr_bin_next  = wr_ptr_bin + ((wr_en && !full) ? 5'b1 : 5'b0);
+    assign rd_ptr_bin_next  = rd_ptr_bin + ((rd_en && !empty) ? 5'b1 : 5'b0);
     assign wr_ptr_gray_next = bin2gray(wr_ptr_bin_next);
     assign rd_ptr_gray_next = bin2gray(rd_ptr_bin_next);
 
@@ -77,7 +77,7 @@ module async_fifo #(
     end
 
     assign empty = (wr_ptr_gray_sync2 == rd_ptr_gray);
-    assign full  = (wr_ptr_gray_next == {~rd_ptr_gray_sync2[ADDR_W:ADDR_W-1],
+    assign full  = (wr_ptr_gray == {~rd_ptr_gray_sync2[ADDR_W:ADDR_W-1],
                                          rd_ptr_gray_sync2[ADDR_W-2:0]});
 
 endmodule

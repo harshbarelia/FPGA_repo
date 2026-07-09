@@ -102,7 +102,7 @@ module tb_async_fifo;
         read_data();
         read_data();
 
-        repeat (DEPTH) write_data($urandom_range(0, 255));
+        repeat (DEPTH) write_data(8'($urandom_range(0, 255)));
         repeat (DEPTH) read_data();
 
         $finish;
