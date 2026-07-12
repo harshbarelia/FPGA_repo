@@ -16,3 +16,4 @@ This repository contains a small FPGA/SystemVerilog learning project focused on 
 
 ## Project goal
 Learn RTL design, CDC basics, FIFO flags, assertions, and scoreboard-style verification.
+

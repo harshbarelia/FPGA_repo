@@ -13,7 +13,7 @@ module uart_rx #(
     localparam int DIVISOR = CLK_FREQ_HZ / BAUD_RATE;
     localparam int CNT_W   = (DIVISOR <= 1) ? 1 : $clog2(DIVISOR);
     localparam logic [CNT_W-1:0] DIVISOR_M1 = CNT_W'(DIVISOR - 1);
-    localparam logic [CNT_W-1:0] MID_COUNT  = CNT_W'(DIVISOR / 2);
+    localparam logic [CNT_W-1:0] MID_COUNT   = CNT_W'(DIVISOR / 2);
 
     typedef enum logic [1:0] {IDLE, START, DATA, STOP} state_t;
     state_t state;
@@ -55,6 +55,7 @@ module uart_rx #(
                         if (!rx_s2) begin
                             cnt     <= '0;
                             bit_idx <= '0;
+                            shreg   <= '0;
                             state   <= DATA;
                         end else begin
                             state <= IDLE;
@@ -66,7 +67,7 @@ module uart_rx #(
 
                 DATA: begin
                     if (cnt == DIVISOR_M1) begin
-                        cnt  <= '0;
+                        cnt   <= '0;
                         shreg <= {rx_s2, shreg[7:1]};
                         if (bit_idx == 3'd7) begin
                             state <= STOP;
@@ -80,13 +81,11 @@ module uart_rx #(
 
                 STOP: begin
                     if (cnt == DIVISOR_M1) begin
-                        cnt     <= '0;
-                        rx_data <= shreg;
-                        rx_valid <= 1'b1;
-                        if (!rx_s2) begin
-                            framing_error <= 1'b1;
-                        end
-                        state <= IDLE;
+                        cnt           <= '0;
+                        rx_data       <= shreg;
+                        rx_valid      <= 1'b1;
+                        framing_error <= !rx_s2;
+                        state         <= IDLE;
                     end else begin
                         cnt <= cnt + 1'b1;
                     end

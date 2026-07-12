@@ -1,6 +1,6 @@
 module uart_tx #(
-    parameter int CLK_FREQ_HZ = 50_000_000,
-    parameter int BAUD_RATE   = 115_200
+    parameter int CLK_FREQ_HZ = 1_000_000,
+    parameter int BAUD_RATE    = 100_000
 ) (
     input  logic       clk,
     input  logic       rst_n,
@@ -13,78 +13,90 @@ module uart_tx #(
 
     localparam int DIVISOR = CLK_FREQ_HZ / BAUD_RATE;
     localparam int CNT_W   = (DIVISOR <= 1) ? 1 : $clog2(DIVISOR);
-    localparam logic [CNT_W-1:0] DIVISOR_M1 = CNT_W'(DIVISOR - 1);
 
-    typedef enum logic [2:0] {IDLE, START, DATA, STOP, DONE} state_t;
+    typedef logic [CNT_W-1:0] cnt_t;
+    localparam cnt_t DIVISOR_M1 = cnt_t'(DIVISOR - 1);
+
+    typedef enum logic [1:0] {IDLE, START, DATA, STOP} state_t;
+
     state_t state;
+    cnt_t   baud_cnt;
+    logic [2:0] bit_idx;
+    logic [7:0] shreg;
+    logic       tx_next;
 
-    logic [CNT_W-1:0] baud_cnt;
-    logic             baud_tick;
-    logic [2:0]       bit_idx;
-    logic [7:0]       shreg;
+    always_comb begin
+        tx_next = tx;
+        case (state)
+            IDLE:  tx_next = 1'b1;
+            START: tx_next = 1'b0;
+            DATA:  tx_next = shreg[0];
+            STOP:  tx_next = 1'b1;
+            default: tx_next = 1'b1;
+        endcase
+    end
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            state     <= IDLE;
-            baud_cnt  <= '0;
-            baud_tick <= 1'b0;
-            bit_idx   <= '0;
-            shreg     <= '0;
-            tx        <= 1'b1;
-            busy      <= 1'b0;
-            tx_done   <= 1'b0;
+            state    <= IDLE;
+            baud_cnt <= '0;
+            bit_idx  <= '0;
+            shreg    <= '0;
+            tx       <= 1'b1;
+            busy     <= 1'b0;
+            tx_done  <= 1'b0;
         end else begin
-            tx_done   <= 1'b0;
-            baud_tick <= 1'b0;
-
-            if (baud_cnt == DIVISOR_M1) begin
-                baud_cnt  <= '0;
-                baud_tick <= 1'b1;
-            end else begin
-                baud_cnt <= baud_cnt + 1'b1;
-            end
+            tx      <= tx_next;
+            tx_done <= 1'b0;
 
             case (state)
                 IDLE: begin
-                    tx   <= 1'b1;
-                    busy <= 1'b0;
+                    busy     <= 1'b0;
+                    baud_cnt <= '0;
+                    bit_idx  <= '0;
                     if (tx_start) begin
-                        state <= START;
-                        busy  <= 1'b1;
                         shreg <= tx_data;
+                        busy  <= 1'b1;
+                        state <= START;
                     end
                 end
 
                 START: begin
-                    if (baud_tick) begin
-                        tx      <= 1'b0;
-                        bit_idx <= 3'b000;
-                        state   <= DATA;
+                    busy <= 1'b1;
+                    if (baud_cnt == DIVISOR_M1) begin
+                        baud_cnt <= '0;
+                        state    <= DATA;
+                        bit_idx  <= 3'd0;
+                    end else begin
+                        baud_cnt <= baud_cnt + 1'b1;
                     end
                 end
 
-                DATA: begin
-                    if (baud_tick) begin
-                        tx    <= shreg[0];
-                        shreg <= {1'b0, shreg[7:1]};
+                    DATA: begin
+                    busy <= 1'b1;
+                    if (baud_cnt == DIVISOR_M1) begin
+                        baud_cnt <= '0;
                         if (bit_idx == 3'd7) begin
                             state <= STOP;
                         end else begin
+                            shreg   <= {1'b0, shreg[7:1]};
                             bit_idx <= bit_idx + 1'b1;
                         end
+                    end else begin
+                        baud_cnt <= baud_cnt + 1'b1;
                     end
                 end
 
                 STOP: begin
-                    if (baud_tick) begin
-                        tx    <= 1'b1;
-                        state <= DONE;
+                    busy <= 1'b1;
+                    if (baud_cnt == DIVISOR_M1) begin
+                        baud_cnt <= '0;
+                        busy     <= 1'b0;
+                        tx_done  <= 1'b1;
+                        state    <= IDLE;
+                    end else begin
+                        baud_cnt <= baud_cnt + 1'b1;
                     end
-                end
-
-                DONE: begin
-                    tx_done <= 1'b1;
-                    state   <= IDLE;
                 end
 
                 default: begin
