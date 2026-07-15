@@ -1,0 +1,6 @@
+# Verilator generated files
+obj_dir/
+*.out
+
+# Zip files/archives
+*.zip
