@@ -42,15 +42,18 @@ module eth_ipv4_udp_parser #(
 
   assign s_rx_ready = 1'b1;
 
-  function automatic logic [15:0] ipv4_checksum16(input logic [7:0] hdr[], input int hdr_len);
-    logic [17:0] sum; int i;
+  function automatic logic [15:0] ipv4_checksum20(input logic [7:0] hdr[20]);
+    logic [19:0] sum;
+    int i;
     begin
       sum = 0;
-      for (i = 0; i < hdr_len; i += 2) begin
+      for (i = 0; i < 20; i += 2) begin
         sum += {hdr[i], hdr[i+1]};
       end
-      while (sum[17:16] != 0) sum = sum[15:0] + sum[17:16];
-      ipv4_checksum16 = ~sum[15:0];
+      // Fold 20-bit sum to 16-bit
+      sum = sum[15:0] + sum[19:16];
+      sum = sum[15:0] + sum[19:16];
+      return ~sum[15:0];
     end
   endfunction
 
@@ -105,16 +108,31 @@ module eth_ipv4_udp_parser #(
             end
             if (byte_cnt == 16) ip_total_len[15:8] <= s_rx_byte;
             if (byte_cnt == 17) ip_total_len[7:0]  <= s_rx_byte;
-            if (byte_cnt == 22) begin
+            if (byte_cnt == 23) begin
+              ip_proto <= s_rx_byte;
+            end
+            if (byte_cnt == 24) begin
               ipv4_hdr_sum[15:8] <= s_rx_byte;
             end
-            if (byte_cnt == 23) begin
+            if (byte_cnt == 25) begin
               ipv4_hdr_sum[7:0] <= s_rx_byte;
-              ip_proto <= s_rx_byte;
             end
             if (byte_cnt == 33) begin
               if (ip_proto != 8'd17) err_invalid_ip <= 1'b1;
               if (ip_total_len < 28)  err_invalid_ip <= 1'b1;
+              
+              // Validate IPv4 Checksum
+              begin
+                logic [7:0] ip_hdr [20];
+                for (int j = 0; j < 20; j++) begin
+                  if (j == 19) ip_hdr[19] = s_rx_byte;
+                  else         ip_hdr[j] = frame[14 + j];
+                end
+                if (ipv4_checksum20(ip_hdr) != 16'h0000) begin
+                  err_invalid_ip <= 1'b1;
+                end
+              end
+
               state <= UDP;
             end
           end

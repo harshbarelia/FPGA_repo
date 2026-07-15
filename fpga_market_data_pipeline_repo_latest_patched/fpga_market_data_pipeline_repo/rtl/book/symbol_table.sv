@@ -50,15 +50,8 @@ module symbol_table #(
     end
   end
 
-  always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-      rd_hit      <= 1'b0;
-      rd_symbol_id <= '0;
-    end else begin
-      rd_hit       <= rd_req & valid_mem[rd_addr];
-      rd_symbol_id <= valid_mem[rd_addr] ? symbol_id_mem[rd_addr] : '0;
-    end
-  end
+  assign rd_hit       = rd_req & valid_mem[rd_addr];
+  assign rd_symbol_id = valid_mem[rd_addr] ? symbol_id_mem[rd_addr] : '0;
 
   a_no_zero_symbol_id: assert property (
     @(posedge clk) disable iff (!rst_n)

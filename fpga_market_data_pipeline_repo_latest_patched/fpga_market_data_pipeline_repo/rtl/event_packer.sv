@@ -7,7 +7,7 @@
 import hft_pkg::*;
 
 module event_packer #(
-    parameter int BEAT_W = 384
+    parameter int BEAT_W = 512
 )(
     input  logic                   clk,
     input  logic                   rst_n,
@@ -32,6 +32,15 @@ module event_packer #(
     else        ts_local_ctr <= ts_local_ctr + 1'b1;
   end
 
+  // synthesis translate_off
+  initial begin
+    if (BEAT_W < REC_W + 64) begin
+      $error("Error: BEAT_W must be >= REC_W + 64");
+      $finish;
+    end
+  end
+  // synthesis translate_on
+
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       m_axis_tvalid <= 1'b0;
@@ -45,7 +54,7 @@ module event_packer #(
       if (s_book_event_valid) begin
         m_axis_tdata <= '0;
         m_axis_tdata[REC_W-1:0] <= s_book_event;
-        m_axis_tdata[BEAT_W-1:BEAT_W-64] <= ts_local_ctr;
+        m_axis_tdata[REC_W+64-1:REC_W] <= ts_local_ctr;
       end
     end
   end

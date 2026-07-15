@@ -1,7 +1,7 @@
 `timescale 1ns/1ps
 import hft_pkg::*;
 module tb_int_pipeline;
-  localparam int MSG_BYTES=64; localparam int MSG_W=MSG_BYTES*8; localparam int BEAT_W=384;
+  localparam int MSG_BYTES=64; localparam int MSG_W=MSG_BYTES*8; localparam int BEAT_W=512;
   `include "tb/vectors/itch_vectors.svh"
   `include "tb/vectors/itch_vectors_seq.svh"
   logic clk=0, rst_n=0; always #5 clk=~clk;
@@ -28,7 +28,7 @@ module tb_int_pipeline;
     rx_valid=0; rx_sof=0; rx_eof=0; rx_byte=0; rst_n=0; repeat(3) @(posedge clk); rst_n=1; @(posedge clk);
     // 81-byte frame: 14 Eth + 20 IP + 8 UDP + 39-byte ITCH Stock Directory (R)
     // IP total len = 67 (0x43), UDP len = 47 (0x2F)
-    frame_r = '{8'h00,8'h11,8'h22,8'h33,8'h44,8'h55,8'h66,8'h77,8'h88,8'h99,8'hAA,8'hBB,8'h08,8'h00,8'h45,8'h00,8'h00,8'h43,8'h00,8'h01,8'h00,8'h00,8'h40,8'h11,8'h00,8'h00,8'h0A,8'h00,8'h00,8'h01,8'h0A,8'h00,8'h00,8'h02,8'h1F,8'h90,8'h1F,8'h90,8'h00,8'h2F,8'h00,8'h00,8'h52,8'h00,8'h01,8'h00,8'h00,8'h00,8'h00,8'h07,8'h5B,8'hCC,8'hBC,8'h41,8'h41,8'h50,8'h4C,8'h20,8'h20,8'h20,8'h20,8'h51,8'h20,8'h00,8'h00,8'h00,8'h64,8'h00,8'h00,8'h00,8'h00,8'h00,8'h00,8'h00,8'h00,8'h00,8'h00,8'h00,8'h00,8'h00,8'h00};
+    frame_r = '{8'h00,8'h11,8'h22,8'h33,8'h44,8'h55,8'h66,8'h77,8'h88,8'h99,8'hAA,8'hBB,8'h08,8'h00,8'h45,8'h00,8'h00,8'h43,8'h00,8'h01,8'h00,8'h00,8'h40,8'h11,8'h66,8'hA7,8'h0A,8'h00,8'h00,8'h01,8'h0A,8'h00,8'h00,8'h02,8'h1F,8'h90,8'h1F,8'h90,8'h00,8'h2F,8'h00,8'h00,8'h52,8'h00,8'h01,8'h00,8'h00,8'h00,8'h00,8'h07,8'h5B,8'hCC,8'hBC,8'h41,8'h41,8'h50,8'h4C,8'h20,8'h20,8'h20,8'h20,8'h51,8'h20,8'h00,8'h00,8'h00,8'h64,8'h00,8'h00,8'h00,8'h00,8'h00,8'h00,8'h00,8'h00,8'h00,8'h00,8'h00,8'h00,8'h00,8'h00};
     send_frame(frame_r, 81);
     repeat(10) @(posedge clk);
     check("directory write assigned nonzero id", sym_wr_assigned_id != 16'd0);

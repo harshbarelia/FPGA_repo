@@ -5,7 +5,7 @@
 // -----------------------------------------------------------------------------
 
 module dma_bridge #(
-    parameter int BEAT_W    = 384,
+    parameter int BEAT_W    = 512,
     parameter int FIFO_DEPTH = 512,
     parameter int ADDR_W    = $clog2(FIFO_DEPTH)
 )(
@@ -41,7 +41,7 @@ module dma_bridge #(
   logic [ADDR_W-1:0] wr_ptr, rd_ptr;
   logic [ADDR_W:0]   occ;
 
-  wire full  = (occ == FIFO_DEPTH);
+  wire full  = (occ == (ADDR_W+1)'(FIFO_DEPTH));
   wire empty = (occ == 0);
 
   assign s_axis_tready = !full;
@@ -96,7 +96,7 @@ module dma_bridge #(
 
   a_occupancy_bounds: assert property (
     @(posedge clk) disable iff (!rst_n)
-    occ <= FIFO_DEPTH)
+    occ <= (ADDR_W+1)'(FIFO_DEPTH))
   else $error("dma_bridge: occupancy exceeded FIFO_DEPTH");
 
 endmodule : dma_bridge
