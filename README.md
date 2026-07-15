@@ -1,19 +1,11 @@
-# FPGA_repo
+# FPGA Repository
 
-This repository contains a small FPGA/SystemVerilog learning project focused on FIFO design and verification.
+This repository contains two FPGA/SystemVerilog projects:
 
-## Modules
-- `rtl/reset_sync.sv` : Reset synchronizer with asynchronous assert and synchronous deassert.
-- `rtl/sync_fifo.sv` : Synchronous FIFO.
-- `rtl/async_fifo.sv` : Asynchronous FIFO using Gray-coded pointers.
+## 1. [FIFO UART](fifo_uart/)
+A project focused on FIFO design (synchronous/asynchronous), Clock Domain Crossing (CDC), Baud rate generation, and UART communication with control-status registers (CSR).
+- Code, documentation, and verification testbenches are organized under the `fifo_uart/` directory.
 
-## Verification
-- `tb/tb_sync_fifo.sv` : Queue-based synchronous FIFO testbench.
-- `tb/tb_async_fifo.sv` : Queue-based asynchronous FIFO testbench.
-- `assert/assert_sync_fifo.sv` : Assertions for synchronous FIFO.
-- `assert/assert_async_fifo.sv` : Assertions for asynchronous FIFO.
-- `assert/bind_fifo_assertions.sv` : Bind file for assertion attachment.
-
-## Project goal
-Learn RTL design, CDC basics, FIFO flags, assertions, and scoreboard-style verification.
-
+## 2. [HFT Market Data Pipeline](fpga_market_data_pipeline_repo_latest_patched/fpga_market_data_pipeline_repo/)
+An ultra-low latency HFT market data processing pipeline that decodes Nasdaq ITCH messages, maintains order book state/BBO calculation, and streams packed events to the host via AXI4-Stream.
+- Located inside the `fpga_market_data_pipeline_repo_latest_patched/fpga_market_data_pipeline_repo/` directory.
