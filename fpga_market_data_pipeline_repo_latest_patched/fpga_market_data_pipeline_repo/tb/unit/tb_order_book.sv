@@ -15,12 +15,14 @@ module tb_order_book;
   logic m_book_event_valid;
   logic m_book_event_ready;
   logic [31:0] cnt_duplicate_add, cnt_missing_order, cnt_agg_underflow, cnt_book_updates;
+  logic [31:0] cnt_ord_set_full, cnt_lvl_set_full, cnt_track_exhausted;
 
   order_book_core dut (
     .clk(clk), .rst_n(rst_n),
     .s_event(s_event), .s_event_valid(s_event_valid), .s_event_ready(s_event_ready),
     .m_book_event(m_book_event), .m_book_event_valid(m_book_event_valid), .m_book_event_ready(m_book_event_ready),
-    .cnt_duplicate_add(cnt_duplicate_add), .cnt_missing_order(cnt_missing_order), .cnt_agg_underflow(cnt_agg_underflow), .cnt_book_updates(cnt_book_updates)
+    .cnt_duplicate_add(cnt_duplicate_add), .cnt_missing_order(cnt_missing_order), .cnt_agg_underflow(cnt_agg_underflow), .cnt_book_updates(cnt_book_updates),
+    .cnt_ord_set_full(cnt_ord_set_full), .cnt_lvl_set_full(cnt_lvl_set_full), .cnt_track_exhausted(cnt_track_exhausted)
   );
 
   always #5 clk = ~clk;
@@ -53,6 +55,43 @@ module tb_order_book;
     check("delete applied", cnt_book_updates == 6);
     drive(EV_CANCEL, 16'd1, 1'b0, 32'd0, 32'd1, 64'd9999);
     check("missing order counted", cnt_missing_order == 1);
+
+    // 1. Order table set full check
+    // We drive 4 ADD events that hash to the same set (index 100):
+    drive(EV_ADD, 16'd1, 1'b0, 32'd110, 32'd10, 64'd100);
+    drive(EV_ADD, 16'd1, 1'b0, 32'd111, 32'd10, 64'd612);
+    drive(EV_ADD, 16'd1, 1'b0, 32'd112, 32'd10, 64'd1124);
+    drive(EV_ADD, 16'd1, 1'b0, 32'd113, 32'd10, 64'd1636);
+    // 5th ADD to same set (index 100) must fail allocation and be flagged/counted
+    drive(EV_ADD, 16'd1, 1'b0, 32'd114, 32'd10, 64'd2148);
+    check("set full drop counted", cnt_ord_set_full == 1);
+    check("set full flag set in dispatch", m_book_event.flags[11] == 1'b1);
+
+    // 2. Tracked level eviction and exhaustion check
+    // Drive 8 different ask levels on symbol 2
+    drive(EV_ADD, 16'd2, 1'b1, 32'd200, 32'd10, 64'd300);
+    drive(EV_ADD, 16'd2, 1'b1, 32'd201, 32'd10, 64'd301);
+    drive(EV_ADD, 16'd2, 1'b1, 32'd202, 32'd10, 64'd302);
+    drive(EV_ADD, 16'd2, 1'b1, 32'd203, 32'd10, 64'd303);
+    drive(EV_ADD, 16'd2, 1'b1, 32'd204, 32'd10, 64'd304);
+    drive(EV_ADD, 16'd2, 1'b1, 32'd205, 32'd10, 64'd305);
+    drive(EV_ADD, 16'd2, 1'b1, 32'd206, 32'd10, 64'd306);
+    drive(EV_ADD, 16'd2, 1'b1, 32'd207, 32'd10, 64'd307);
+    check("best ask is 200 before eviction", dut.best_ask_price[2] == 32'd200);
+
+    // 9th level with a better price (50) -> evicts worst level (207)
+    drive(EV_ADD, 16'd2, 1'b1, 32'd50, 32'd10, 64'd308);
+    check("best ask is 50 after eviction", dut.best_ask_price[2] == 32'd50);
+    check("track exhausted counted on eviction", cnt_track_exhausted == 1);
+
+    // 10th level with a worse price (300) -> fails tracking
+    drive(EV_ADD, 16'd2, 1'b1, 32'd300, 32'd10, 64'd309);
+    check("track exhausted counted on fail to track", cnt_track_exhausted == 2);
+
+    // Delete the best ask (50) and verify BBO correctly reverts to 200 (not 207)
+    drive(EV_DELETE, 16'd2, 1'b1, 32'd0, 32'd0, 64'd308);
+    check("best ask correctly reverted to 200", dut.best_ask_price[2] == 32'd200);
+
     $display("SUMMARY pass=%0d fail=%0d", pass_count, fail_count);
     $finish;
   end

@@ -27,7 +27,10 @@ module order_book_core #(
     output logic [31:0]          cnt_duplicate_add,
     output logic [31:0]          cnt_missing_order,
     output logic [31:0]          cnt_agg_underflow,
-    output logic [31:0]          cnt_book_updates
+    output logic [31:0]          cnt_book_updates,
+    output logic [31:0]          cnt_ord_set_full,
+    output logic [31:0]          cnt_lvl_set_full,
+    output logic [31:0]          cnt_track_exhausted
 );
 
   // Set-associative parameters: 4-way set associative
@@ -482,6 +485,9 @@ module order_book_core #(
       cnt_missing_order <= '0;
       cnt_agg_underflow <= '0;
       cnt_book_updates <= '0;
+      cnt_ord_set_full <= '0;
+      cnt_lvl_set_full <= '0;
+      cnt_track_exhausted <= '0;
       
       for (int s = 0; s < ORD_SETS; s++) begin
         for (int w = 0; w < ORD_WAYS; w++) begin
@@ -527,7 +533,15 @@ module order_book_core #(
             if (ord_hit) begin
               cnt_duplicate_add <= cnt_duplicate_add + 1'b1;
               m_book_event.flags[8] <= 1'b1;
-            end else if (ord_alloc_ok && (lvl_hit || lvl_alloc_ok)) begin
+            end else if (!ord_alloc_ok) begin
+              cnt_ord_set_full <= cnt_ord_set_full + 1'b1;
+              m_book_event.flags[11] <= 1'b1;
+              m_book_event_valid <= 1'b1;
+            end else if (!lvl_hit && !lvl_alloc_ok) begin
+              cnt_lvl_set_full <= cnt_lvl_set_full + 1'b1;
+              m_book_event.flags[12] <= 1'b1;
+              m_book_event_valid <= 1'b1;
+            end else begin
               order_mem[ord_set][ord_alloc_way].valid <= 1'b1;
               order_mem[ord_set][ord_alloc_way].order_id <= s_event.order_id;
               order_mem[ord_set][ord_alloc_way].symbol_id <= s_event.symbol_id;
@@ -542,11 +556,62 @@ module order_book_core #(
                 level_mem[lvl_set_new][lvl_alloc_way].price <= s_event.price;
                 level_mem[lvl_set_new][lvl_alloc_way].agg_qty <= s_event.qty;
 
-                for (int t = 0; t < N_TRACKED; t++) begin
-                  if (!tracked_lvl_val[sym_idx][s_event.side][t]) begin
-                    tracked_lvl_idx[sym_idx][s_event.side][t] = {lvl_set_new, lvl_alloc_way};
-                    tracked_lvl_val[sym_idx][s_event.side][t] = 1'b1;
-                    break;
+                begin
+                  logic has_empty;
+                  int empty_idx;
+                  logic [PRICE_W-1:0] worst_price;
+                  int w_slot;
+                  
+                  has_empty = 1'b0;
+                  empty_idx = 0;
+                  for (int t = 0; t < N_TRACKED; t++) begin
+                    if (!tracked_lvl_val[sym_idx][s_event.side][t]) begin
+                      has_empty = 1'b1;
+                      empty_idx = t;
+                      break;
+                    end
+                  end
+                  
+                  if (has_empty) begin
+                    tracked_lvl_idx[sym_idx][s_event.side][empty_idx] = {lvl_set_new, lvl_alloc_way};
+                    tracked_lvl_val[sym_idx][s_event.side][empty_idx] = 1'b1;
+                  end else begin
+                    w_slot = 0;
+                    begin
+                      logic [LVL_SET_W-1:0] ts_set = tracked_lvl_idx[sym_idx][s_event.side][0][LVL_ADDR_W-1:LVL_WAY_W];
+                      logic [LVL_WAY_W-1:0] ts_way = tracked_lvl_idx[sym_idx][s_event.side][0][LVL_WAY_W-1:0];
+                      worst_price = level_mem[ts_set][ts_way].price;
+                    end
+                    
+                    for (int t = 1; t < N_TRACKED; t++) begin
+                      logic [LVL_SET_W-1:0] ts_set = tracked_lvl_idx[sym_idx][s_event.side][t][LVL_ADDR_W-1:LVL_WAY_W];
+                      logic [LVL_WAY_W-1:0] ts_way = tracked_lvl_idx[sym_idx][s_event.side][t][LVL_WAY_W-1:0];
+                      logic [PRICE_W-1:0] t_price = level_mem[ts_set][ts_way].price;
+                      
+                      if (!s_event.side) begin // Bid: worst is lowest price
+                        if (t_price < worst_price) begin
+                          worst_price = t_price;
+                          w_slot = t;
+                        end
+                      end else begin // Ask: worst is highest price
+                        if (t_price > worst_price) begin
+                          worst_price = t_price;
+                          w_slot = t;
+                        end
+                      end
+                    end
+                    
+                    if (!s_event.side) begin
+                      if (s_event.price > worst_price) begin
+                        tracked_lvl_idx[sym_idx][s_event.side][w_slot] = {lvl_set_new, lvl_alloc_way};
+                      end
+                      cnt_track_exhausted <= cnt_track_exhausted + 1'b1;
+                    end else begin
+                      if (s_event.price < worst_price) begin
+                        tracked_lvl_idx[sym_idx][s_event.side][w_slot] = {lvl_set_new, lvl_alloc_way};
+                      end
+                      cnt_track_exhausted <= cnt_track_exhausted + 1'b1;
+                    end
                   end
                 end
               end else begin
@@ -643,7 +708,15 @@ module order_book_core #(
               if (level_mem[lvl_set_old][lvl_hit_way_old].agg_qty < d_qty || !lvl_hit_old) begin
                 cnt_agg_underflow <= cnt_agg_underflow + 1'b1;
                 m_book_event.flags[10] <= 1'b1;
-              end else if (ord_alloc_ok_new && (lvl_hit || lvl_alloc_ok)) begin
+              end else if (!ord_alloc_ok_new) begin
+                cnt_ord_set_full <= cnt_ord_set_full + 1'b1;
+                m_book_event.flags[11] <= 1'b1;
+                m_book_event_valid <= 1'b1;
+              end else if (!lvl_hit && !lvl_alloc_ok) begin
+                cnt_lvl_set_full <= cnt_lvl_set_full + 1'b1;
+                m_book_event.flags[12] <= 1'b1;
+                m_book_event_valid <= 1'b1;
+              end else begin
                 order_mem[ord_set][ord_hit_way].valid <= 1'b0;
 
                 order_mem[ord_set_new][ord_alloc_way_new].valid <= 1'b1;
@@ -667,18 +740,69 @@ module order_book_core #(
 
                 if (lvl_upd_2) begin
                   if (!lvl_hit) begin
-                    if (lvl_alloc_ok) begin
-                      level_mem[lvl_set_new][lvl_alloc_way].valid <= 1'b1;
-                      level_mem[lvl_set_new][lvl_alloc_way].symbol_id <= order_mem[ord_set][ord_hit_way].symbol_id;
-                      level_mem[lvl_set_new][lvl_alloc_way].side <= order_mem[ord_set][ord_hit_way].side;
-                      level_mem[lvl_set_new][lvl_alloc_way].price <= s_event.price;
-                      level_mem[lvl_set_new][lvl_alloc_way].agg_qty <= lvl_upd_qty_2;
+                    level_mem[lvl_set_new][lvl_alloc_way].valid <= 1'b1;
+                    level_mem[lvl_set_new][lvl_alloc_way].symbol_id <= order_mem[ord_set][ord_hit_way].symbol_id;
+                    level_mem[lvl_set_new][lvl_alloc_way].side <= order_mem[ord_set][ord_hit_way].side;
+                    level_mem[lvl_set_new][lvl_alloc_way].price <= s_event.price;
+                    level_mem[lvl_set_new][lvl_alloc_way].agg_qty <= lvl_upd_qty_2;
 
+                    begin
+                      logic has_empty;
+                      int empty_idx;
+                      logic [PRICE_W-1:0] worst_price;
+                      int w_slot;
+                      logic o_side;
+                      o_side = order_mem[ord_set][ord_hit_way].side;
+                      
+                      has_empty = 1'b0;
+                      empty_idx = 0;
                       for (int t = 0; t < N_TRACKED; t++) begin
-                        if (!tracked_lvl_val[sym_idx][order_mem[ord_set][ord_hit_way].side][t]) begin
-                          tracked_lvl_idx[sym_idx][order_mem[ord_set][ord_hit_way].side][t] = {lvl_set_new, lvl_alloc_way};
-                          tracked_lvl_val[sym_idx][order_mem[ord_set][ord_hit_way].side][t] = 1'b1;
+                        if (!tracked_lvl_val[sym_idx][o_side][t]) begin
+                          has_empty = 1'b1;
+                          empty_idx = t;
                           break;
+                        end
+                      end
+                      
+                      if (has_empty) begin
+                        tracked_lvl_idx[sym_idx][o_side][empty_idx] = {lvl_set_new, lvl_alloc_way};
+                        tracked_lvl_val[sym_idx][o_side][empty_idx] = 1'b1;
+                      end else begin
+                        w_slot = 0;
+                        begin
+                          logic [LVL_SET_W-1:0] ts_set = tracked_lvl_idx[sym_idx][o_side][0][LVL_ADDR_W-1:LVL_WAY_W];
+                          logic [LVL_WAY_W-1:0] ts_way = tracked_lvl_idx[sym_idx][o_side][0][LVL_WAY_W-1:0];
+                          worst_price = level_mem[ts_set][ts_way].price;
+                        end
+                        
+                        for (int t = 1; t < N_TRACKED; t++) begin
+                          logic [LVL_SET_W-1:0] ts_set = tracked_lvl_idx[sym_idx][o_side][t][LVL_ADDR_W-1:LVL_WAY_W];
+                          logic [LVL_WAY_W-1:0] ts_way = tracked_lvl_idx[sym_idx][o_side][t][LVL_WAY_W-1:0];
+                          logic [PRICE_W-1:0] t_price = level_mem[ts_set][ts_way].price;
+                          
+                          if (!o_side) begin // Bid: worst is lowest price
+                            if (t_price < worst_price) begin
+                              worst_price = t_price;
+                              w_slot = t;
+                            end
+                          end else begin // Ask: worst is highest price
+                            if (t_price > worst_price) begin
+                              worst_price = t_price;
+                              w_slot = t;
+                            end
+                          end
+                        end
+                        
+                        if (!o_side) begin
+                          if (s_event.price > worst_price) begin
+                            tracked_lvl_idx[sym_idx][o_side][w_slot] = {lvl_set_new, lvl_alloc_way};
+                          end
+                          cnt_track_exhausted <= cnt_track_exhausted + 1'b1;
+                        end else begin
+                          if (s_event.price < worst_price) begin
+                            tracked_lvl_idx[sym_idx][o_side][w_slot] = {lvl_set_new, lvl_alloc_way};
+                          end
+                          cnt_track_exhausted <= cnt_track_exhausted + 1'b1;
                         end
                       end
                     end
