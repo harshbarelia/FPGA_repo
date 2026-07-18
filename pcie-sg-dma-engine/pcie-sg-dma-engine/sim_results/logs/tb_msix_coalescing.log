@@ -1,0 +1,20 @@
+
+--- Test 1: Timeout-based fire ---
+PASS: timeout fire: msix fired at least once (time=365000)
+
+--- Test 2: No spurious fire ---
+PASS: no-event: msix did NOT fire (time=865000)
+
+--- Test 3: Near-full force-fire ---
+PASS: near-full: msix fired quickly (time=975000)
+
+--- Test 4: Multiple coalesced events ---
+PASS: coalesced: fires <= events (coalescing worked) (time=1505000)
+  (fire_count=1 for 3 events)
+
+========================================
+tb_msix_coalescing: 4 PASS, 0 FAIL
+RESULT: ALL TESTS PASSED
+========================================
+
+- tb/directed/tb_msix_coalescing.sv:156: Verilog $finish

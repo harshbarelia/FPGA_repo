@@ -1,0 +1,5 @@
+test_name,descriptor_dir,length_bytes,cycles_dispatch_to_done,latency_ns,notes
+tb_c2h_single_test_1,C2H,32,6,60.0,Single-beat payload streaming
+tb_c2h_single_test_2,C2H,64,7,70.0,Two-beat payload streaming (Max Payload Size reached)
+tb_h2c_single_test_1,H2C,64,12,120.0,Single-request DMA read and AXI-Stream forwarding
+tb_h2c_single_test_2,H2C,128,19,190.0,Multi-request DMA read split across two completions
