@@ -1,11 +1,26 @@
-# FPGA Repository
+# ⚡ High-Performance SystemVerilog & FPGA Designs
 
-This repository contains two FPGA/SystemVerilog projects:
+A curated collection of production-grade SystemVerilog hardware IP cores, PCIe DMA controllers, FPGA streaming data pipelines, and UART serial communication engines.
 
-## 1. [FIFO UART](fifo_uart/)
-A project focused on FIFO design (synchronous/asynchronous), Clock Domain Crossing (CDC), Baud rate generation, and UART communication with control-status registers (CSR).
-- Code, documentation, and verification testbenches are organized under the `fifo_uart/` directory.
+---
 
-## 2. [HFT Market Data Pipeline](fpga_market_data_pipeline_repo_latest_patched/fpga_market_data_pipeline_repo/)
-An ultra-low latency HFT market data processing pipeline that decodes Nasdaq ITCH messages, maintains order book state/BBO calculation, and streams packed events to the host via AXI4-Stream.
-- Located inside the `fpga_market_data_pipeline_repo_latest_patched/fpga_market_data_pipeline_repo/` directory.
+## 📁 Repository Projects
+
+| Project | Description | Target Interfaces | Key Verification |
+|---|---|---|---|
+| 🚀 [**PCIe Scatter-Gather DMA Engine**](./pcie-sg-dma-engine) | Complete PCIe DMA Engine for AXI4-Lite hard IP endpoints. Includes descriptor ring fetcher, H2C/C2H engines, mutex arbiter, and MSI-X interrupts. | AXI4-Lite, PCIe BAR0, MSI-X | Verified in Verilator (100% Data Integrity) |
+| 📊 [**FPGA Market Data Pipeline**](./fpga_market_data_pipeline_repo_latest_patched) | Low-latency order book and market data parsing pipeline for high-frequency trading (HFT) applications. | AXI4-Stream, Ethernet MAC | Verified with SystemVerilog TB |
+| 🔌 [**FIFO UART Controller**](./fifo_uart) | Asynchronous FIFO-buffered UART transmitter and receiver module with baud rate generator. | UART RX/TX, FIFO | RTL Verified |
+
+---
+
+## 🛠️ Verification & Toolchain Support
+
+- **Simulators**: Verilator 5.x+, Icarus Verilog (`iverilog`), ModelSim / QuestaSim.
+- **Synthesis Toolchains**: Xilinx Vivado, Intel Quartus Prime, Lattice Radiant.
+- **Languages**: SystemVerilog (IEEE 1800-2017), C++ Verilator testbenches.
+
+---
+
+## 📜 License
+Licensed under MIT. Open for hardware community contributions and commercial/research usage.

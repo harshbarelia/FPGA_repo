@@ -1,0 +1,30 @@
+# Makefile.verilator
+# Makefile to compile and execute SystemVerilog PCIe DMA Engine testbench using Verilator
+
+VERILATOR ?= verilator
+VERILATOR_FLAGS = --binary --trace -Wall -Wno-fatal \
+                  -Irtl -Itb \
+                  rtl/dma_pkg.sv \
+                  rtl/dma_top.sv \
+                  rtl/axi_lite_csr.sv \
+                  rtl/desc_fetch_engine.sv \
+                  rtl/h2c_engine.sv \
+                  rtl/c2h_engine.sv \
+                  rtl/axi4_arbiter.sv \
+                  rtl/irq_ctrl.sv \
+                  tb/axi4_mem_bfm.sv \
+                  tb/dma_top_tb.sv \
+                  --top-module dma_top_tb
+
+all: run
+
+build:
+	$(VERILATOR) $(VERILATOR_FLAGS)
+
+run: build
+	./obj_dir/Vdma_top_tb
+
+clean:
+	rm -rf obj_dir dma_top_verilator.vcd
+
+.PHONY: all build run clean
