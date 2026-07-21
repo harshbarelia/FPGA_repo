@@ -1,0 +1,31 @@
+# Simulation build artifacts
+*.vcd
+*.fst
+obj_dir/
+*.o
+*.so
+*.out
+*.exe
+
+# Python cache & output
+__pycache__/
+*.pyc
+latency_histogram.png
+
+# Linux kernel driver build artifacts
+*.ko
+*.mod
+*.mod.c
+*.o.cmd
+*.ko.cmd
+modules.order
+Module.symvers
+.tmp_versions/
+
+# Vivado / EDA tool outputs
+*.log
+*.jou
+*.rpt
+.Xil/
+work/
+transcript
